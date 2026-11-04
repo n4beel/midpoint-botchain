@@ -4,6 +4,7 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "ghost";
   size?: "sm" | "md" | "lg";
+  loading?: boolean;
 }
 
 export function Button({
@@ -11,6 +12,7 @@ export function Button({
   className = "",
   variant = "primary",
   size = "md",
+  loading,
   disabled,
   ...props
 }: ButtonProps) {
@@ -33,11 +35,16 @@ export function Button({
 
   return (
     <button
-      disabled={disabled}
+      disabled={disabled || loading}
       className={`font-semibold rounded-lg transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none inline-flex items-center justify-center gap-2 ${vClass} ${sClass} ${className}`}
       {...props}
     >
+      {loading && (
+        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+      )}
       {children}
     </button>
   );
 }
+
+export default Button;

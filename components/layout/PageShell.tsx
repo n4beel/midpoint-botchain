@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ConnectButton } from "@/components/ui/ConnectButton";
-import { NetworkBadge } from "@/components/botchain/NetworkBadge";
-import { BuiltOnBotChain } from "@/components/botchain/BuiltOnBotChain";
+import ConnectButton from "@/components/ui/ConnectButton";
+import NetworkBadge from "@/components/botchain/NetworkBadge";
+import BuiltOnBotChain from "@/components/botchain/BuiltOnBotChain";
 import { footerLinks } from "@/lib/botchain/chain";
 
 interface PageShellProps {
