@@ -79,7 +79,7 @@ export default function DealDetailPage({
     refetchDeal();
     const interval = setInterval(refetchDeal, 5000);
     return () => clearInterval(interval);
-  }, [publicClient, contractAddress, dealId]);
+  }, [publicClient?.chain?.id, contractAddress, dealId]);
 
   const handleCommit = async (commitHash: Hex, _salt: Hex, price: bigint) => {
     if (!contractAddress || !publicClient || !deal) return;

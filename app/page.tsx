@@ -85,7 +85,7 @@ export default function HomePage() {
     loadDeals();
     const interval = setInterval(loadDeals, 10000);
     return () => clearInterval(interval);
-  }, [publicClient, contractAddress]);
+  }, [publicClient?.chain?.id, contractAddress]);
 
   return (
     <PageShell activeTab="deals">

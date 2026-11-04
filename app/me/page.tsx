@@ -61,7 +61,7 @@ export default function MyEscrowPage() {
     loadUserData();
     const interval = setInterval(loadUserData, 6000);
     return () => clearInterval(interval);
-  }, [publicClient, contractAddress, address]);
+  }, [publicClient?.chain?.id, contractAddress, address]);
 
   const handleWithdraw = async () => {
     if (!contractAddress || !publicClient) return;

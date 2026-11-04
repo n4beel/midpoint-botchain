@@ -696,6 +696,43 @@ contract MidpointTest is Test {
     assertEq(latestIds[1], 4);
     assertEq(latestIds[2], 3);
   }
+
+  function test_ExactBoundaryValues() public {
+    // 1. Exact 64-byte title succeeds
+    string memory exact64 = "1234567890123456789012345678901234567890123456789012345678901234";
+    vm.prank(seller);
+    midpoint.open(
+      buyer, exact64, "Terms", DEFAULT_CEILING, DEFAULT_COMMIT_SECS, DEFAULT_REVEAL_SECS
+    );
+
+    // 2. Exact MAX_WINDOW commitSecs (7 days) succeeds
+    vm.prank(seller);
+    midpoint.open(buyer, "Title", "Terms", DEFAULT_CEILING, 7 days, DEFAULT_REVEAL_SECS);
+
+    // 3. Exact revealBy boundary: at timestamp == revealBy, window has NOT expired yet!
+    uint256 id = _openDefaultDeal();
+    bytes32 saltS = bytes32(uint256(10));
+    vm.prank(seller);
+    midpoint.commit(id, _calcCommitment(id, seller, 0.4 ether, saltS));
+    vm.prank(buyer);
+    midpoint.commit{value: DEFAULT_CEILING}(
+      id, _calcCommitment(id, buyer, 0.8 ether, bytes32(uint256(20)))
+    );
+
+    // Warp to revealBy:
+    // revealBy was set when both committed at block.timestamp (1_760_000_000). revealBy = 1_760_000_000 + 3600 = 1_760_003_600.
+    vm.warp(1_760_003_600);
+    vm.prank(seller);
+    midpoint.reveal(id, 0.4 ether, saltS);
+
+    // Only seller revealed, and block.timestamp <= revealBy, so window has not expired (> revealBy) -> settle reverts NotSettleable
+    vm.expectRevert(Midpoint.NotSettleable.selector);
+    midpoint.settle(id);
+
+    // 4. Exact total pagination count clamp
+    (uint256[] memory ids,) = midpoint.byParty(seller, 1, 100);
+    assertTrue(ids.length > 0);
+  }
 }
 
 contract ReentrantAttacker {
