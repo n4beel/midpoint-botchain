@@ -1,28 +1,28 @@
-import { HTMLAttributes } from "react";
+import React from "react";
 
-interface PanelProps extends HTMLAttributes<HTMLDivElement> {
-  elevated?: boolean;
-  noPadding?: boolean;
+interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: "envelope" | "flat" | "elevated";
 }
 
-export default function Panel({
-  elevated,
-  noPadding,
+export function Panel({
   children,
   className = "",
-  style,
+  variant = "envelope",
   ...props
 }: PanelProps) {
+  let baseClass = "p-5 ";
+  if (variant === "envelope") {
+    baseClass +=
+      "bg-[var(--bg-surface)] border-2 border-[var(--border-default)] rounded-xl shadow-sm ";
+  } else if (variant === "elevated") {
+    baseClass +=
+      "bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-xl ";
+  } else {
+    baseClass += "bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg ";
+  }
+
   return (
-    <div
-      className={["rounded-none", noPadding ? "" : "p-5", className].join(" ")}
-      style={{
-        background: elevated ? "var(--bg-elevated)" : "var(--bg-surface)",
-        border: "1px solid var(--border-subtle)",
-        ...style,
-      }}
-      {...props}
-    >
+    <div className={`${baseClass} ${className}`} {...props}>
       {children}
     </div>
   );
