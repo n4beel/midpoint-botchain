@@ -48,5 +48,5 @@ Visit `http://localhost:3000` to interact with seeded deals.
 
 ## Contract Deployments
 
-- **Bohr Testnet (Chain ID 968)**: `0x3Aa5ebB10DC797CAC828524e59A333d0A371443c`
+- **Bohr Testnet (Chain ID 968)**: `0xe3a3A33A0125474eDa5108451a4F89623033355F`
 - **BOT Chain Explorer**: [https://scan.botchain.ai](https://scan.botchain.ai)
