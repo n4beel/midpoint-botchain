@@ -42,6 +42,68 @@ export interface Deal {
   title: string;
 }
 
+export const ZERO_COMMIT = "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+/** Has this party sealed a price yet? (The contract stores the zero hash until they do.) */
+export function hasCommitted(deal: Pick<Deal, "sellerCommit" | "buyerCommit">, role: "seller" | "buyer"): boolean {
+  return (role === "seller" ? deal.sellerCommit : deal.buyerCommit) !== ZERO_COMMIT;
+}
+
+/**
+ * Which actions the contract would accept right now, mirroring Midpoint.sol exactly, so the screen only offers
+ * what can work:
+ *   commit  - state Open and before commitBy
+ *   reveal  - state Revealing and not after revealBy
+ *   settle  - Open once commitBy has passed (closes the deal and refunds), or Revealing once both prices are revealed
+ *             or revealBy has passed
+ *   cancel  - seller only, state Open, buyer has not sealed yet
+ * `now` is chain time in seconds.
+ */
+export function actionsFor(
+  deal: Pick<Deal, "state" | "commitBy" | "revealBy" | "sellerCommit" | "buyerCommit" | "askRevealed" | "bidRevealed">,
+  now: bigint,
+): {
+  canCommit: boolean;
+  canReveal: boolean;
+  canSettle: boolean;
+  settleKind: "match" | "expired" | null;
+  canCancel: boolean;
+  waitingOn: string;
+} {
+  const open = deal.state === DealState.Open;
+  const revealing = deal.state === DealState.Revealing;
+  const commitOpen = open && now < deal.commitBy;
+  const revealOpen = revealing && now <= deal.revealBy;
+  const bothRevealed = deal.askRevealed && deal.bidRevealed;
+  const settleOpenExpired = open && now >= deal.commitBy;
+  const settleRevealing = revealing && (bothRevealed || now > deal.revealBy);
+  const sellerIn = hasCommitted(deal, "seller");
+  const buyerIn = hasCommitted(deal, "buyer");
+
+  let waitingOn = "";
+  if (open) {
+    if (settleOpenExpired) waitingOn = "The commit window closed before both sides sealed a price. Anyone can close the deal out.";
+    else if (!sellerIn && !buyerIn) waitingOn = "Waiting for both sides to seal a price.";
+    else if (!sellerIn) waitingOn = "Buyer has sealed. Waiting for the seller to seal a price.";
+    else if (!buyerIn) waitingOn = "Seller has sealed. Waiting for the buyer to seal a price and escrow the ceiling.";
+  } else if (revealing) {
+    if (bothRevealed) waitingOn = "Both prices are revealed. Anyone can settle.";
+    else if (now > deal.revealBy) waitingOn = "The reveal window closed. Anyone can close the deal out.";
+    else if (!deal.askRevealed && !deal.bidRevealed) waitingOn = "Both sealed. Waiting for both sides to reveal.";
+    else if (!deal.askRevealed) waitingOn = "Buyer has revealed. Waiting for the seller to reveal.";
+    else waitingOn = "Seller has revealed. Waiting for the buyer to reveal.";
+  }
+
+  return {
+    canCommit: commitOpen,
+    canReveal: revealOpen,
+    canSettle: settleOpenExpired || settleRevealing,
+    settleKind: settleRevealing && bothRevealed ? "match" : settleOpenExpired || settleRevealing ? "expired" : null,
+    canCancel: open && !buyerIn,
+    waitingOn,
+  };
+}
+
 export interface SaltFilePayload {
   dealId: string;
   role: "seller" | "buyer";

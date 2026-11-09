@@ -4,8 +4,8 @@ import React, { useState } from "react";
 import { formatEther, type Address, type Hex } from "viem";
 import { Button } from "@/components/ui/Button";
 import {
-  DealState,
   commitment,
+  hasCommitted,
   randomSalt,
   saltFile,
   storeSaltLocally,
@@ -19,6 +19,9 @@ interface EnvelopeCardProps {
   onCommit: (commitHash: Hex, salt: Hex, price: bigint) => Promise<void>;
   onReveal: (price: bigint, salt: Hex) => Promise<void>;
   submitting?: boolean;
+  /** Whether the contract would accept a commit / a reveal right now (see actionsFor). */
+  canCommit?: boolean;
+  canReveal?: boolean;
 }
 
 export function EnvelopeCard({
@@ -28,10 +31,12 @@ export function EnvelopeCard({
   onCommit,
   onReveal,
   submitting,
+  canCommit = false,
+  canReveal = false,
 }: EnvelopeCardProps) {
   const isSeller = role === "seller";
   const partyAddress = isSeller ? deal.seller : deal.buyer;
-  const committed = isSeller ? deal.sellerCommit !== "0x0000000000000000000000000000000000000000000000000000000000000000" : deal.buyerCommit !== "0x0000000000000000000000000000000000000000000000000000000000000000";
+  const committed = hasCommitted(deal, role);
   const revealed = isSeller ? deal.askRevealed : deal.bidRevealed;
   const revealedPrice = isSeller ? deal.ask : deal.bid;
 
@@ -143,7 +148,7 @@ export function EnvelopeCard({
             </div>
 
             {/* Commit Form if Current Party and deal is Open */}
-            {isCurrentParty && deal.state === DealState.Open && (
+            {isCurrentParty && canCommit && (
               <form onSubmit={handleCommitSubmit} className="space-y-3 pt-2">
                 <div className="text-xs font-medium text-[var(--text-secondary)]">
                   Seal your {role} price. You cannot change it, and you must reveal it later.
@@ -233,7 +238,7 @@ export function EnvelopeCard({
             </div>
 
             {/* Reveal Form if deal is in Revealing state and current party hasn't revealed */}
-            {isCurrentParty && deal.state === DealState.Revealing && (
+            {isCurrentParty && canReveal && (
               <form onSubmit={handleRevealSubmit} className="space-y-3 pt-2">
                 <div className="text-xs font-semibold text-[var(--text-primary)]">
                   Reveal your secret price:

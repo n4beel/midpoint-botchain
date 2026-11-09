@@ -2,7 +2,7 @@
 
 import React from "react";
 import { formatEther } from "viem";
-import { DealState, type Deal } from "@/lib/midpoint";
+import { DealState, hasCommitted, type Deal } from "@/lib/midpoint";
 
 interface NumberLineProps {
   deal: Deal;
@@ -21,6 +21,9 @@ export function NumberLine({ deal }: NumberLineProps) {
   const bidPct = bid !== null && ceiling > 0 ? Math.min(100, Math.max(0, (bid / ceiling) * 100)) : null;
   const pricePct = tradePrice !== null && ceiling > 0 ? Math.min(100, Math.max(0, (tradePrice / ceiling) * 100)) : null;
 
+  const sellerSealed = hasCommitted(deal, "seller");
+  const buyerSealed = hasCommitted(deal, "buyer");
+  const sealedText = (sealed: boolean) => (sealed ? "Sealed in envelope" : "Not sealed yet");
   const overlap = ask !== null && bid !== null && bid >= ask;
   const noDeal = ask !== null && bid !== null && bid < ask;
 
@@ -110,13 +113,13 @@ export function NumberLine({ deal }: NumberLineProps) {
           <div>
             <span className="text-[var(--text-muted)]">Seller Ask: </span>
             <span className="font-mono font-semibold">
-              {ask !== null ? `${ask} BOT` : "Sealed in envelope"}
+              {ask !== null ? `${ask} BOT` : sealedText(sellerSealed)}
             </span>
           </div>
           <div>
             <span className="text-[var(--text-muted)]">Buyer Bid: </span>
             <span className="font-mono font-semibold">
-              {bid !== null ? `${bid} BOT` : "Sealed in envelope"}
+              {bid !== null ? `${bid} BOT` : sealedText(buyerSealed)}
             </span>
           </div>
           <div>
@@ -126,7 +129,11 @@ export function NumberLine({ deal }: NumberLineProps) {
                 ? `Traded at ${tradePrice} BOT`
                 : deal.state === DealState.Void
                 ? "Void / No Deal"
-                : "Awaiting Reveals"}
+                : deal.state === DealState.Revealing
+                ? "Awaiting Reveals"
+                : sellerSealed || buyerSealed
+                ? "Awaiting Seals"
+                : "Nothing sealed yet"}
             </span>
           </div>
         </div>

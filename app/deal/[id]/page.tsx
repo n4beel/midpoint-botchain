@@ -15,7 +15,7 @@ import { midpointAbi } from "@/lib/botchain/abi";
 import { activeBotChain } from "@/lib/botchain/chain";
 import { getDeployment, isDeployed } from "@/lib/botchain/deployment";
 import { describeError } from "@/lib/errors";
-import { DealState, type Deal } from "@/lib/midpoint";
+import { DealState, actionsFor, type Deal } from "@/lib/midpoint";
 
 export default function DealDetailPage({
   params,
@@ -35,6 +35,9 @@ export default function DealDetailPage({
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  // Chain time, ticking once a second between reads: windows open and close by block.timestamp, not by the user's clock.
+  const [clockOffset, setClockOffset] = useState(0);
+  const [nowSecs, setNowSecs] = useState(() => BigInt(Math.floor(Date.now() / 1000)));
 
   const deployed = isDeployed(activeBotChain.id);
   const contractAddress = deployed ? getDeployment(activeBotChain.id).address : undefined;
@@ -42,6 +45,8 @@ export default function DealDetailPage({
   async function refetchDeal() {
     if (!publicClient || !contractAddress) return;
     try {
+      const block = await publicClient.getBlock();
+      setClockOffset(Number(block.timestamp) - Math.floor(Date.now() / 1000));
       const d = await publicClient.readContract({
         address: contractAddress,
         abi: midpointAbi,
@@ -80,6 +85,13 @@ export default function DealDetailPage({
     const interval = setInterval(refetchDeal, 5000);
     return () => clearInterval(interval);
   }, [publicClient?.chain?.id, contractAddress, dealId]);
+
+  useEffect(() => {
+    const tick = () => setNowSecs(BigInt(Math.floor(Date.now() / 1000) + clockOffset));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [clockOffset]);
 
   const handleCommit = async (commitHash: Hex, _salt: Hex, price: bigint) => {
     if (!contractAddress || !publicClient || !deal) return;
@@ -222,10 +234,7 @@ export default function DealDetailPage({
 
   const isSeller = address?.toLowerCase() === deal.seller.toLowerCase();
   const isBuyer = address?.toLowerCase() === deal.buyer.toLowerCase();
-  const bothCommitted =
-    deal.sellerCommit !== "0x0000000000000000000000000000000000000000000000000000000000000000" &&
-    deal.buyerCommit !== "0x0000000000000000000000000000000000000000000000000000000000000000";
-  const bothRevealed = deal.askRevealed && deal.bidRevealed;
+  const act = actionsFor(deal, nowSecs);
 
   return (
     <PageShell>
@@ -309,6 +318,8 @@ export default function DealDetailPage({
             onCommit={handleCommit}
             onReveal={handleReveal}
             submitting={submitting}
+            canCommit={act.canCommit}
+            canReveal={act.canReveal}
           />
 
           <EnvelopeCard
@@ -318,6 +329,8 @@ export default function DealDetailPage({
             onCommit={handleCommit}
             onReveal={handleReveal}
             submitting={submitting}
+            canCommit={act.canCommit}
+            canReveal={act.canReveal}
           />
         </div>
 
@@ -326,11 +339,16 @@ export default function DealDetailPage({
           <div className="text-xs text-[var(--text-secondary)] space-y-1">
             <p className="font-semibold text-sm text-[var(--text-primary)]">Lifecycle Actions</p>
             {deal.state === DealState.Open && (
-              <p>Commitment window closes at unix timestamp {deal.commitBy.toString()}.</p>
+              <p>
+                Commit window {nowSecs < deal.commitBy ? "closes" : "closed"} at {new Date(Number(deal.commitBy) * 1000).toLocaleString()}.
+              </p>
             )}
             {deal.state === DealState.Revealing && (
-              <p>Reveal window closes at unix timestamp {deal.revealBy.toString()}.</p>
+              <p>
+                Reveal window {nowSecs <= deal.revealBy ? "closes" : "closed"} at {new Date(Number(deal.revealBy) * 1000).toLocaleString()}.
+              </p>
             )}
+            {act.waitingOn && <p className="text-[var(--text-primary)]">{act.waitingOn}</p>}
             {deal.state === DealState.Settled && (
               <p className="text-[var(--success)] font-bold">
                 Deal Settled! Final Trade Price: {formatEther(deal.price)} BOT
@@ -344,29 +362,17 @@ export default function DealDetailPage({
           </div>
 
           <div className="flex items-center gap-3">
-            {isSeller && deal.state === DealState.Open && !deal.buyerCommit && (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleCancel}
-                disabled={submitting}
-              >
+            {isSeller && act.canCancel && (
+              <Button variant="danger" size="sm" onClick={handleCancel} disabled={submitting}>
                 Cancel Deal
               </Button>
             )}
 
-            {(bothRevealed || deal.state === DealState.Revealing || deal.state === DealState.Open) &&
-              deal.state !== DealState.Settled &&
-              deal.state !== DealState.Void && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={handleSettle}
-                  disabled={submitting}
-                >
-                  {submitting ? "Settling..." : "Settle Deal"}
-                </Button>
-              )}
+            {act.canSettle && (
+              <Button variant="primary" size="md" onClick={handleSettle} disabled={submitting}>
+                {submitting ? "Settling..." : act.settleKind === "match" ? "Settle Deal" : "Close Out Deal"}
+              </Button>
+            )}
           </div>
         </div>
 
